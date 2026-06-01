@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.DS_Store
+.claude/
+*.log
+.vite/
+
+# TypeScript incremental build cache (from `tsc -b`)
+*.tsbuildinfo
+
+# Local env / secrets
+.env
+.env.*
+
+
+# Externally-fetched protein assets — TED domains (*.domains.json) + AlphaFold
+# structures (structures/*.cif), regenerated via scripts/fetch-protein-assets.mjs.
+# (How to distribute these external resources is TBD.)
+resources/**/proteins/
+resources/_archive/
