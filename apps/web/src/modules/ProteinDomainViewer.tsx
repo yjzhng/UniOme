@@ -130,17 +130,24 @@ function ProteinDomainViewerComponent({ feature, taxid }: ModuleContext) {
   // Clicking a domain's residues copies that domain's sequence (segments joined).
   const copyDomain = (d: ProteinDomains['domains'][number]) => {
     if (feature.prot_seq) {
-      copyText(d.segments.map(([s, e]) => feature.prot_seq!.slice(s - 1, e)).join(''), d.id);
+      // Join discontinuous segments with "-" so the copied sequence doesn't read as
+      // one contiguous stretch (single-segment domains get no dash).
+      copyText(d.segments.map(([s, e]) => feature.prot_seq!.slice(s - 1, e)).join('-'), d.id);
     }
   };
   const copyFull = () => {
     if (feature.prot_seq) copyText(feature.prot_seq, 'full sequence');
   };
 
+  // aa ruler: always label the ends (1 and length), then round ticks in between,
+  // dropping any that sit within half a step of an end so labels don't overlap.
   const step = niceStep(length);
-  const ticks: number[] = [];
-  for (let t = 0; t <= length; t += step) ticks.push(t);
-  if (ticks[ticks.length - 1] !== length) ticks.push(length);
+  const minGap = step / 2;
+  const ticks: number[] = [1];
+  for (let t = step; t < length; t += step) {
+    if (t - 1 >= minGap && length - t >= minGap) ticks.push(t);
+  }
+  ticks.push(length);
 
   return (
     <div className="space-y-4">

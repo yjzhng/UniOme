@@ -75,7 +75,7 @@ app.get<{ Params: { taxid: string; acc: string } }>(
   async (req, reply) => {
     const path = proteinStructurePath(req.params.taxid, req.params.acc);
     if (!path) return reply.code(404).send({ error: 'structure not found' });
-    return reply.type('chemical/x-cif').send(readFileSync(path, 'utf8'));
+    return reply.type('application/octet-stream').send(readFileSync(path));
   }
 );
 

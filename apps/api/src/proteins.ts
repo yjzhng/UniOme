@@ -17,20 +17,28 @@ export function loadProteinDomains(taxid: string, acc: string): ProteinDomains |
   if (!ACC_RE.test(acc)) return null;
   const org = getOrganism(taxid);
   if (!org) return null;
-  const path = resolve(RESOURCES, org.config.folder, 'proteins', `${acc}.domains.json`);
+  const path = resolve(RESOURCES, org.config.folder, 'proteins', 'domains', `${acc}.json`);
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as ProteinDomains;
+    const data = JSON.parse(readFileSync(path, 'utf8')) as ProteinDomains;
+    // TED returns domains unsorted; order them by TED id (TED01, TED02, …) so the
+    // table, track and sequence read consistently.
+    const idNum = (d: ProteinDomains['domains'][number]) => {
+      const m = /(\d+)/.exec(d.id);
+      return m ? Number(m[1]) : Infinity;
+    };
+    data.domains?.sort((a, b) => idNum(a) - idNum(b));
+    return data;
   } catch {
     return null;
   }
 }
 
-// Path to the locally-stored AlphaFold mmCIF for a protein, or null if absent.
-// Structures are gitignored (large) and produced by scripts/fetch-protein-assets.mjs.
+// Path to the locally-stored AlphaFold structure (BinaryCIF) for a protein, or null if
+// absent. Structures are gitignored (large) and produced by scripts/fetch-protein-assets.mjs.
 export function proteinStructurePath(taxid: string, acc: string): string | null {
   if (!ACC_RE.test(acc)) return null;
   const org = getOrganism(taxid);
   if (!org) return null;
-  const path = resolve(RESOURCES, org.config.folder, 'proteins', 'structures', `${acc}.cif`);
+  const path = resolve(RESOURCES, org.config.folder, 'proteins', 'structures', `${acc}.bcif`);
   return existsSync(path) ? path : null;
 }

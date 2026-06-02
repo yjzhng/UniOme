@@ -118,7 +118,7 @@ export default function MolstarViewer({
         },
       });
 
-      const data = await plugin.builders.data.download({ url: structureUrl, isBinary: false });
+      const data = await plugin.builders.data.download({ url: structureUrl, isBinary: true });
       const traj = await plugin.builders.structure.parseTrajectory(data, 'mmcif');
       await plugin.builders.structure.hierarchy.applyPreset(traj, 'default');
 

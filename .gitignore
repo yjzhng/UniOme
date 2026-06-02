@@ -13,8 +13,8 @@ dist/
 .env.*
 
 
-# Externally-fetched protein assets — TED domains (*.domains.json) + AlphaFold
-# structures (structures/*.cif), regenerated via scripts/fetch-protein-assets.mjs.
-# (How to distribute these external resources is TBD.)
-resources/**/proteins/
-resources/_archive/
+# Organism data is distributed as one archive per org (resources/<org>/ → a GitHub
+# Release asset) and restored by `npm run setup`. Nothing under resources/ is committed
+# except the shared CATH build cache.
+resources/*
+!resources/_shared/

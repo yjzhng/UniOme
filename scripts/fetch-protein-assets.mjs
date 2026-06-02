@@ -26,8 +26,10 @@ const AF_PREDICTION = (acc) => `https://alphafold.ebi.ac.uk/api/prediction/${acc
 // superfamily page carries newer live names the released API still returns null for.
 const CATH_SFAM_API = (id) => `https://www.cathdb.info/version/v4_4_0/api/rest/superfamily/${id}`;
 const CATH_SFAM_PAGE = (id) => `https://www.cathdb.info/version/latest/superfamily/${id}`;
-// Shared, organism-independent CATH code → name cache so we look up each code once.
-const CATH_NAMES_FILE = resolve(RESOURCES, 'cath-names.json');
+// Shared CATH code → name cache (build-time only; names are baked into each domain
+// JSON, so the app never reads this). Accumulates across organism fetches so common
+// superfamilies are looked up once.
+const CATH_NAMES_FILE = resolve(RESOURCES, '_shared', 'cath-names.json');
 
 function decodeEntities(s) {
   return s
@@ -135,21 +137,21 @@ async function fetchTedDomains(acc) {
   return { acc, length: maxRes || null, source: 'TED', domains };
 }
 
-// Download the AlphaFold model into structures/<acc>.cif. We query the prediction
-// API first because the file version moves (currently v6; the old hardcoded v4 404s).
-// Large + gitignored. Skips if already present.
+// Download the AlphaFold model into structures/<acc>.bcif (BinaryCIF — ~2.3x smaller
+// than text cif, lossless, Mol*-native). Query the prediction API first because the
+// file version moves (currently v6). Large + gitignored. Skips if already present.
 async function fetchAlphaFoldStructure(acc, structDir) {
-  const out = resolve(structDir, `${acc}.cif`);
+  const out = resolve(structDir, `${acc}.bcif`);
   if (existsSync(out)) return; // resume: already downloaded
   const meta = await get(AF_PREDICTION(acc));
   if (!meta.ok) throw new Error(`AlphaFold prediction ${acc}: HTTP ${meta.status}`);
   const arr = await meta.json();
-  const cifUrl = Array.isArray(arr) && arr[0]?.cifUrl;
-  if (!cifUrl) throw new Error(`AlphaFold ${acc}: no cifUrl (no model?)`);
-  const cif = await get(cifUrl);
-  if (!cif.ok) throw new Error(`AlphaFold cif ${acc}: HTTP ${cif.status}`);
+  const bcifUrl = Array.isArray(arr) && arr[0]?.bcifUrl;
+  if (!bcifUrl) throw new Error(`AlphaFold ${acc}: no bcifUrl (no model?)`);
+  const res = await get(bcifUrl);
+  if (!res.ok) throw new Error(`AlphaFold bcif ${acc}: HTTP ${res.status}`);
   mkdirSync(structDir, { recursive: true });
-  writeFileSync(out, await cif.text());
+  writeFileSync(out, Buffer.from(await res.arrayBuffer()));
 }
 
 // Distinct UniProt accessions of CDS features in an organism's *_DB.csv.
@@ -198,8 +200,10 @@ async function main() {
 
   const folder = orgFolder(taxid);
   const outDir = resolve(RESOURCES, folder, 'proteins');
+  const domDir = resolve(outDir, 'domains');
   const structDir = resolve(outDir, 'structures');
-  mkdirSync(outDir, { recursive: true });
+  mkdirSync(domDir, { recursive: true });
+  mkdirSync(resolve(RESOURCES, '_shared'), { recursive: true });
   const cathCache = loadCathCache();
 
   const list = accs ?? cdsAccessions(folder);
@@ -207,7 +211,7 @@ async function main() {
 
   let done = 0;
   await pool(list, CONCURRENCY, async (acc) => {
-    const domOut = resolve(outDir, `${acc}.domains.json`);
+    const domOut = resolve(domDir, `${acc}.json`);
     if (!existsSync(domOut)) {
       try {
         const data = await fetchTedDomains(acc);
