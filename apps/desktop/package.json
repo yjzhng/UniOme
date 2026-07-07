@@ -1,0 +1,16 @@
+{
+  "name": "@uniome/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UniOme desktop app (Electron shell around the embedded Fastify server + web UI)",
+  "author": "yjzhng (https://github.com/yjzhng)",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build:server": "esbuild ../api/src/index.ts --bundle --platform=node --format=cjs --target=node20 --packages=bundle --outfile=build/server.cjs --log-level=error",
+    "build:web": "npm run build -w @uniome/web && rm -rf build/web && cp -R ../web/dist build/web",
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --mac --config electron-builder.yml"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "_comment": "Org-specific infra config for M. tuberculosis H37Rv. Cross-database IDs (VERIFY before a real build) + availability. Set available:true + url + bytes once the backend is built and the archive is hosted. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "83332",
+  "speciesTaxid": "1773",
+  "refAssembly": "GCF_000195955.2",
+  "paxdbSpecies": "83332",
+  "imodulonOrg": "m_tuberculosis",
+  "imodulonDataset": "modulome",
+  "available": true,
+  "url": "83332_Mtb.tar.gz",
+  "bytes": 170644484
+}

@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: UniOme
+message: >-
+  If you use UniOme, please cite this software. Note that the biological
+  datasets UniOme integrates each have their own required citations — see
+  docs/data-attribution.md for the per-source papers to cite.
+type: software
+authors:
+  - name: yjzhng
+    website: "https://github.com/yjzhng"
+abstract: >-
+  A local-first annotation-database browser for prokaryotes: per-gene
+  annotation, protein/RNA structure and features, interactions, regulation,
+  and pathways, integrating data from ~30 external biological databases.
+repository-code: "https://github.com/yjzhng/UniOme"
+url: "https://github.com/yjzhng/UniOme"
+license: MIT
+version: 0.1.0
+date-released: "2026-07-07"
+keywords:
+  - bioinformatics
+  - prokaryotes
+  - genome annotation
+  - protein structure
+  - Escherichia coli

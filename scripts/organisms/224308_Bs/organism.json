@@ -1,0 +1,12 @@
+{
+  "_comment": "Org-specific infra config for B. subtilis subsp. subtilis str. 168. Cross-database IDs (VERIFY before a real build) + availability. Set available:true + url + bytes once the backend is built and the archive is hosted. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "224308",
+  "speciesTaxid": "1423",
+  "refAssembly": "GCF_000009045.1",
+  "paxdbSpecies": "224308",
+  "imodulonOrg": "b_subtilis",
+  "imodulonDataset": "modulome",
+  "available": true,
+  "url": "224308_Bs.tar.gz",
+  "bytes": 165054804
+}

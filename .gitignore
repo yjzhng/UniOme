@@ -1,0 +1,32 @@
+node_modules/
+dist/
+.DS_Store
+.claude/
+*.log
+.vite/
+
+# TypeScript incremental build cache (from `tsc -b`)
+*.tsbuildinfo
+
+# Desktop app build artifacts (generated: bundled server + copied web dist + packaged installers)
+apps/desktop/build/
+apps/desktop/dist/
+
+# Local env / secrets
+.env
+.env.*
+.uniome.env
+
+
+# Organism data is distributed as one archive per org (resources/<org>/ → a GitHub
+# Release asset) and restored by `npm run setup`. Nothing under resources/ is committed
+# except the shared CATH build cache.
+resources/*
+!resources/_shared/
+!resources/organism-catalog.json
+!resources/organism-pipeline.md
+scripts/enrich/utils/__pycache__/
+scripts/enrich/.venv/
+resources/*/_enrich_cache/
+
+UniOmeKB.xlsx

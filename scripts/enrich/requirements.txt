@@ -1,0 +1,4 @@
+# UniOme core-DB enrichment (scripts/enrich/enrich.py) — same deps prokDB uses.
+biopython
+pandas
+requests

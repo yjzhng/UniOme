@@ -1,0 +1,44 @@
+appId: com.yjzhng.uniome
+productName: UniOme
+copyright: © yjzhng
+
+# Pinned because electron is hoisted to the repo-root node_modules (npm workspaces), so
+# electron-builder can't infer the version from apps/desktop/node_modules.
+electronVersion: 33.4.11
+
+directories:
+  output: dist
+  buildResources: build-resources
+
+# What goes inside the app (asar). The single-file server bundle + the Electron shell; node_modules
+# is intentionally absent (the server is fully bundled, the shell uses only Electron built-ins).
+files:
+  - electron/**
+  - build/server.cjs
+  - build/organism-catalog.json
+  - build/organisms/**
+  - build/icon.png
+  - package.json
+
+# The web dist is shipped UNPACKED (a real directory) so the embedded server's @fastify/static can
+# serve it; it lands at <App>/Contents/Resources/web (process.resourcesPath/web).
+extraResources:
+  - from: build/web
+    to: web
+
+asar: true
+
+mac:
+  category: public.app-category.education
+  icon: build-resources/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  # Code-signing/notarization intentionally omitted for now — unsigned builds run via right-click →
+  # Open. To sign later: set CSC_LINK/CSC_KEY_PASSWORD + an Apple Developer ID and add notarize config.
+
+dmg:
+  title: ${productName} ${version}

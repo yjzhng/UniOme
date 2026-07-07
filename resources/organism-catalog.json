@@ -1,0 +1,9 @@
+{
+  "_comment": "Home-page tile registry — the organisms UniOme knows about. An entry needs the identifiers known at registration: taxid, nickname, keggid, and `name` (a human-readable label shown on the tile before the data is downloaded — the precise species/strain still comes from the enriched DB once ready). Everything else lives in the org's infra folder scripts/organisms/<taxid>_<nickname>/organism.json: cross-DB ids (stringSpecies, speciesTaxid, paxdbSpecies) and the availability/download info (available, url, bytes). Committed (un-ignored in .gitignore) even though it lives under the otherwise-gitignored resources/.",
+  "organisms": [
+    { "taxid": "83333", "nickname": "Ec", "keggid": "eco", "name": "Escherichia coli K-12" },
+    { "taxid": "83332", "nickname": "Mtb", "keggid": "mtu", "name": "Mycobacterium tuberculosis H37Rv" },
+    { "taxid": "93061", "nickname": "Sa", "keggid": "sao", "name": "Staphylococcus aureus NCTC 8325" },
+    { "taxid": "224308", "nickname": "Bs", "keggid": "bsu", "name": "Bacillus subtilis 168" }
+  ]
+}

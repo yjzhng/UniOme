@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/* Class-based dark mode (a `dark` class on <html>, toggled in the header / init'd in index.html). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* A horizontally-pannable scroll container with an invisible scrollbar — content stays
+   wheel/trackpad-scrollable and drag-pannable, but the bar itself doesn't draw (regulatory map). */
+.pan-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+.pan-scroll::-webkit-scrollbar { height: 0; width: 0; background: transparent; }
+.pan-scroll::-webkit-scrollbar-thumb { background: transparent; }
+
+/* Fully adaptive theming WITHOUT per-component dark: variants or hardcoded hex: remap the neutral
+   ramp + white/black under .dark. Tailwind v4 compiles every `bg-white`/`text-neutral-900`/border etc.
+   to `var(--color-*)`, so flipping these inverts lightness everywhere while preserving the relative
+   relationships (page < card < chip < border …) that the light aesthetic depends on. Accent/data
+   colours (KEGG, heatmaps, network palettes) are left untouched so encodings stay meaningful. */
+.dark {
+  --color-white: #1a1a1c;       /* elevated surfaces (cards, header) */
+  --color-black: #fafafa;       /* rare text-black/bg-black → flip so it stays legible */
+  --color-neutral-50:  #111113; /* page background (recessed) */
+  --color-neutral-100: #202023; /* subtle fills / hovers / chips */
+  --color-neutral-200: #2c2c30; /* borders / dividers */
+  --color-neutral-300: #3d3d42; /* stronger borders / rings */
+  --color-neutral-400: #6c6c75; /* faint text, icons */
+  --color-neutral-500: #98989f; /* secondary text */
+  --color-neutral-600: #b3b3b9; /* secondary body */
+  --color-neutral-700: #cccccf;
+  --color-neutral-800: #e4e4e6;
+  --color-neutral-900: #f2f2f3; /* primary text */
+  --color-neutral-950: #fafafa;
+}
+
+/* Mol*'s bundled dark.css (loaded via molstar-dark.css) re-themes only a subset of its coloured
+   selectors, so several secondary control-text selectors keep molstar.css's light tan/brown
+   (#332b1f / #63533c / #9c835f) and read as illegible in dark mode. Force them legible. `!important`
+   beats molstar's rules regardless of their compound-selector specificity; these target only chrome
+   text (labels, help, group headers, link/toggle text), never data/accent colours. */
+.dark .msp-plugin .msp-control-row-label,
+.dark .msp-plugin .msp-control-button-label,
+.dark .msp-plugin .msp-control-group-header,
+.dark .msp-plugin .msp-control-group-header > span,
+.dark .msp-plugin .msp-control-group-header > button,
+.dark .msp-plugin .msp-control-group-header div,
+.dark .msp-plugin .msp-help-row > span,
+.dark .msp-plugin .msp-help-text > div,
+.dark .msp-plugin .msp-help-text > p,
+.dark .msp-plugin .msp-simple-help-section,
+.dark .msp-plugin .msp-row-text > div,
+.dark .msp-plugin .msp-btn-link,
+.dark .msp-plugin .msp-btn-link-toggle-on,
+.dark .msp-plugin .msp-transform-header > button,
+.dark .msp-plugin .msp-plugin-content { color: #c7d1de !important; }
+.dark .msp-plugin .msp-btn-link-toggle-off,
+.dark .msp-plugin .msp-viewport-controls-buttons .msp-btn-link-toggle-off,
+.dark .msp-plugin .msp-btn-icon[disabled],
+.dark .msp-plugin .msp-btn-icon-small[disabled] { color: #7e8b9c !important; }
+.dark .msp-plugin select option,
+.dark .msp-plugin .msp-action-select option { color: #ccd4e0; background: #16191f; }
+
+/* R2DT 2D RNA structure (external SVG, class-driven colours). R2DT colours the nucleotide LETTERS by
+   agreement with the family template (black=match, green=differs, magenta=insertion, blue=repositioned) —
+   a template detail we don't surface, so render every base letter in ONE neutral colour (the meaningful
+   colour is the annotation overlay behind the letters; position numbers keep their gray). The structure
+   lines (backbone + base pairs) are left as R2DT drew them; on the dark page only their near-black `black`
+   class is lightened so it stays visible. CSS (not an invert() filter) keeps the vector SVG crisp; the
+   `!important` + `.dark …` selectors outrank the SVG's own injected scoped rules. */
+.rna2d text:not(.numbering-label) { fill: #334155 !important; }
+.dark .rna2d text:not(.numbering-label) { fill: #cbd5e1 !important; }
+.dark .rna2d line.black,
+.dark .rna2d circle.black { stroke: #d4d4d4; }
+.dark .rna2d line.blue,
+.dark .rna2d circle.blue { stroke: #6ea8ff; }

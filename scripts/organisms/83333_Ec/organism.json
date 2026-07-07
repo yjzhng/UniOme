@@ -1,0 +1,10 @@
+{
+  "_comment": "Org-specific infra config for E. coli K-12. Cross-database IDs (research knowledge, not derivable from the taxid) + availability/download. The keggid/nickname live in the tile registry (resources/organism-catalog.json); display name/species/strain come from the enriched DB; the RefSeq assembly is auto-resolved by enrich.py.",
+  "stringSpecies": "511145",
+  "speciesTaxid": "562",
+  "refAssembly": "GCF_000005845.2",
+  "paxdbSpecies": "511145",
+  "available": true,
+  "url": "83333_Ec.tar.gz",
+  "bytes": 317101082
+}
