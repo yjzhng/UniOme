@@ -10,6 +10,10 @@ directories:
   output: dist
   buildResources: build-resources
 
+# Give the packaged .app a valid ad-hoc signature (see the hook) so a quarantined download shows the
+# friendly "unidentified developer" dialog with a GUI "Open Anyway" — not "damaged" (which needs Terminal).
+afterPack: scripts/after-pack.cjs
+
 # What goes inside the app (asar). The single-file server bundle + the Electron shell; node_modules
 # is intentionally absent (the server is fully bundled, the shell uses only Electron built-ins).
 files:

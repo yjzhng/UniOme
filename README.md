@@ -11,32 +11,26 @@ Organisms currently available (more added over time):
 - *Staphylococcus aureus* NCTC 8325
 - *Bacillus subtilis* 168
 
-## Quickstart — desktop app (macOS)
+## Quickstart — install the app (macOS)
 
-The simplest way to run UniOme. Requires [Node.js](https://nodejs.org) and git installed.
+1. Download the `.dmg` from the [latest release](https://github.com/yjzhng/UniOme/releases/latest) — `arm64` (Apple Silicon) or `x64` (Intel).
+2. Open it and drag **UniOme** to Applications.
+3. **First launch**:
+   - **macOS 15 (Sequoia) or newer:** double-click UniOme → "not opened" alert appears → open  **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**
+   - **macOS 14 or older:** **right-click** UniOme → **Open** → **Open** in the dialog.
+4. After that it opens normally
 
-1. **Clone the repo** and open its folder in Finder.
-2. **Double-click `UniOme.app`.** The first launch installs dependencies (a few minutes) and then
-   opens UniOme in its own window; later launches are instant. `git pull` + relaunch to update.
-3. On the home page, click **Download data** on an organism tile (~110–320 MB each). A progress bar
-   tracks the download; when it finishes the organism opens.
+> [!NOTE]
+> Alternative gatekeeper fixes via terminal
+> 1. ```brew install --cask``` (once a cask exists)
+> 2. ```xattr -dr com.apple.quarantine /Applications/UniOme.app``` (once installed)
 
-First launch shows a one-time **data-use notice** (academic/non-commercial) — see
-[Licensing & data](#licensing--data). More detail: [apps/desktop/README.md](apps/desktop/README.md).
+## Run from source (developers)
 
-## Advanced — run from source (CLI)
+Needs [Node.js](https://nodejs.org) + git.
 
-For development, or on Linux/without the desktop launcher:
-
-```bash
-npm install      # install all workspace deps
-npm run setup    # bulk-download all organism data from the public GitHub Release
-npm run dev      # API on :4000, web on :5173
-```
-
-Then open **http://localhost:5173** and pick an organism. The repo and its data Release are
-**public**, so `npm run setup` needs no authentication — it uses the GitHub CLI (`gh`) if installed,
-otherwise a plain download (`gh` optional). Everything runs locally thereafter.
+- **Native window (macOS):** clone the repo, double-click `UniOme.app` — see [apps/desktop/README.md](apps/desktop/README.md).
+- **Browser / any OS:** `npm install && npm run setup && npm run dev` → http://localhost:5173
 
 ## Licensing & data
 
