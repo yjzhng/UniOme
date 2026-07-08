@@ -3,6 +3,7 @@ dist/
 .DS_Store
 .claude/
 *.log
+/logs/
 .vite/
 
 # TypeScript incremental build cache (from `tsc -b`)

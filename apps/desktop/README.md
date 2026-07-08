@@ -28,9 +28,11 @@ apps/desktop/launch.sh             npm install (1st run) → npm run setup if no
 apps/desktop/scripts/dev.mjs       picks free ports; runs API (tsx) + Vite (HMR) + Electron window
 ```
 
-First launch installs deps + fetches data (a few minutes, with macOS notifications); later launches
-are instant. Run it headless/CLI with `npm run dev -w @uniome/desktop` (opens devtools unless
-`UNIOME_DEVTOOLS=0`). Log goes to `$TMPDIR/uniome-launch.log`.
+First launch installs deps (with a persistent progress window) + opens; later launches are instant.
+Run it headless/CLI with `npm run dev -w @uniome/desktop` (opens devtools unless `UNIOME_DEVTOOLS=0`).
+Logs are written under the repo at `logs/launch.log` — the whole launch (install + API/Vite/Electron)
+is captured there. Each launch starts a fresh `launch.log` (so it holds just the current session) and
+keeps the previous session as `logs/launch.log.1`. Gitignored.
 
 ## Packaged build — internals
 

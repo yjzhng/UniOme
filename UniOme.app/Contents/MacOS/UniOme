@@ -3,5 +3,15 @@
 # repo it lives in, then hands off to apps/desktop/launch.sh in the background and exits, so only the
 # Electron app window remains. Update by `git pull` in the repo and relaunch — nothing to reinstall.
 DIR="$(cd "$(dirname "$0")/../../.." && pwd)" # repo root: UniOme.app/Contents/MacOS → ../../..
-nohup "$DIR/apps/desktop/launch.sh" >"${TMPDIR:-/tmp}/uniome-launch.log" 2>&1 &
+
+# Logs go under the repo (logs/), so they stay with the portable app folder and are easy to find.
+# Fresh log each launch: the previous session is kept as launch.log.1 and launch.log starts anew, so
+# it always holds just the current session. All of launch.sh's output (install, API/Vite/Electron) is
+# appended here. (logs/ is gitignored.)
+LOG_DIR="$DIR/logs"
+mkdir -p "$LOG_DIR"
+LOG="$LOG_DIR/launch.log"
+[ -f "$LOG" ] && mv -f "$LOG" "$LOG.1"                                    # keep prior session as .1
+{ echo "===== UniOme launch $(date '+%Y-%m-%d %H:%M:%S %z') ====="; } >"$LOG" 2>&1  # start fresh
+nohup "$DIR/apps/desktop/launch.sh" >>"$LOG" 2>&1 &
 exit 0
