@@ -60,16 +60,34 @@ npm start    -w @uniome/desktop      # build + launch the packaged-style app (el
 > In some sandboxes `ELECTRON_RUN_AS_NODE=1` is set globally, which makes `electron .` run as plain
 > Node (`app` is undefined). If you hit that, launch with `env -u ELECTRON_RUN_AS_NODE electron .`.
 
-## Package a .dmg
+## Package a .dmg — Electron bundled, zero user-side install
+
+The `.dmg` is the distribution for anyone who can't (or shouldn't) run the from-source launcher —
+non-technical users, or **locked-down machines that block npm install scripts** (a global
+`ignore-scripts`, `@lavamoat/allow-scripts`, corporate policy). electron-builder bundles **Electron +
+the built server + web UI** into a self-contained `UniOme.app`, so the end user just drags it to
+Applications and opens it — **no `npm install`, no postinstall scripts, no Electron download.** Electron
+is fetched at *build* time on the maintainer's machine, so the user's environment never matters.
+(The from-source `UniOme.app` still needs npm/Electron on first run; that's the developer path.)
 
 ```bash
-npm run dist -w @uniome/desktop                       # arm64 + x64 dmgs → dist/
-# or one arch:  npx electron-builder --mac dmg --arm64 --config electron-builder.yml
+npm run dist            # arm64 + x64 → apps/desktop/dist/UniOme-<version>-<arch>.dmg
+npm run dist:arm64      # Apple silicon only (fastest)
+npm run dist:x64        # Intel only
 ```
 
-Builds are **unsigned** — first launch needs right-click → **Open** (Gatekeeper). To distribute
-beyond your lab, sign + notarize: set `CSC_LINK` / `CSC_KEY_PASSWORD` to an Apple Developer ID
-cert and add a notarize step. (Windows is not built here; add a `win` target + a Windows CI runner.)
+The build first runs `scripts/build.mjs` (esbuild the server + `vite build` the web + copy the org
+configs), then electron-builder packages it. Output `apps/desktop/dist/` is gitignored. **Publish** by
+uploading to the GitHub Release so users can download it:
+
+```bash
+gh release upload assets apps/desktop/dist/UniOme-*.dmg --clobber
+```
+
+Builds are **unsigned** — first launch needs right-click → **Open** (Gatekeeper), and a browser-
+downloaded `.dmg` may need `xattr -dr com.apple.quarantine UniOme.app` after copying. To distribute
+beyond your lab, sign + notarize: set `CSC_LINK` / `CSC_KEY_PASSWORD` to an Apple Developer ID cert and
+add a notarize step. (Windows is not built here; add a `win` target + a Windows CI runner.)
 
 ## Organisms: the catalog & 3-state tiles
 
@@ -79,14 +97,15 @@ one of three states — exactly the lifecycle of **adding an organism**:
 
 | Step | Where | Tile |
 |---|---|---|
-| 1. Add the tile | `{ taxid, nickname, keggid }` in `resources/organism-catalog.json` | **planned** — "not yet supported" |
+| 1. Add the tile | `{ taxid, nickname, keggid, name }` in `resources/organism-catalog.json` | **planned** — "not yet supported" |
 | 2. Build its backend + host its archive | `available: true` + `url` (+ `bytes`) in `scripts/organisms/<folder>/organism.json` | **available** — *Download data* button |
 | 3. Download (+ on-disk resource check) | data lands in `resources/<folder>` | **ready** — links into the organism page |
 
-The registry only carries the identifiers known at registration — **taxid, nickname, keggid**.
-Everything else lives with the org's build infra: cross-DB ids (`stringSpecies`/`speciesTaxid`/`paxdbSpecies`)
-and the availability/download (`available`/`url`/`bytes`). The display name/species/strain are
-**derived from the enriched DB** (before download the tile is labelled by its nickname). The data dir is
+The registry carries the identifiers known at registration — **taxid, nickname, keggid** — plus a
+human-readable **`name`** shown on the tile before any data exists. Everything else lives with the org's
+build infra: cross-DB ids (`stringSpecies`/`speciesTaxid`/`paxdbSpecies`) and the availability/download
+(`available`/`url`/`bytes`). The precise species/strain is **derived from the enriched DB** once ready
+(before download the tile is labelled by `name`, else the nickname). The data dir is
 `resources/<folder>`, where `folder` defaults to **`<taxid>_<nickname>`** (e.g. `83333_Ec`).
 "Ready" means the server discovered the organism on disk (valid core DB → chromosomes) — the
 resource check. Data is **not** bundled and **not** downloaded at startup — the app opens

@@ -33,11 +33,26 @@ note() { osascript -e "display notification \"$1\" with title \"UniOme\"" >/dev/
 
 # First run — or a previous interrupted install — installs workspace deps (Electron, Vite, tsx, …).
 # We gate on Electron's actual downloaded binary, NOT just node_modules/: a fresh `npm install`
-# creates the dirs first, then Electron's postinstall fetches a ~150 MB binary. If that step stalls or
-# is force-quit, the dirs exist but the binary doesn't — a plain "is node_modules there?" check would
-# then skip install forever and the window would never open. So re-install until Electron is really
-# present, and surface failures (this runs headless under the .app, so silent errors look like a hang).
-electron_ready() { [ -e node_modules/electron/dist/Electron.app ] || [ -e node_modules/electron/path.txt ]; }
+# creates the dirs first, then Electron's postinstall fetches a ~150 MB binary. If that step stalls,
+# is force-quit, or is skipped entirely (see ensure_electron), the dirs exist but the real binary
+# doesn't — a plain "is node_modules there?" check would then skip install forever and the window would
+# never open. So we verify Electron's ACTUAL binary (via path.txt, exactly like electron/index.js does)
+# — a partial dist/ dir isn't enough — and surface failures (headless, so silent errors look like a hang).
+electron_ready() {
+  [ -f node_modules/electron/path.txt ] &&
+    [ -x "node_modules/electron/dist/$(cat node_modules/electron/path.txt 2>/dev/null)" ]
+}
+
+# Download Electron's binary directly. `npm install` runs the postinstall that normally does this, but
+# some setups skip ALL package install scripts (a global `ignore-scripts=true`, @lavamoat/allow-scripts,
+# corporate npm policy) — then npm "succeeds" with no usable Electron and the app crashes with "Electron
+# failed to install correctly". Running its installer explicitly fetches the binary regardless (it's
+# idempotent: skips the download if already cached).
+ensure_electron() {
+  electron_ready && return 0
+  [ -f node_modules/electron/install.js ] || return 1
+  ( cd node_modules/electron && node install.js )
+}
 
 # Persistent progress window for the first-run install. macOS notification banners auto-dismiss after
 # a few seconds and can't show a bar, so we compile a tiny AppleScript *applet* at runtime — its
@@ -90,7 +105,8 @@ APPLESCRIPT
 if [ ! -d node_modules ] || ! electron_ready; then
   win=0
   if start_progress_window; then win=1; else note "First run: setting up UniOme… (a few minutes)"; fi
-  npm install >>"$LOG" 2>&1 &
+  # Install deps, then guarantee Electron's binary even if npm skipped its postinstall (ensure_electron).
+  { npm install && ensure_electron; } >>"$LOG" 2>&1 &
   npm_pid=$!
   # Phase inferred from the filesystem (Electron's ~150 MB binary is the slow part and lands last, in
   # its postinstall). npm gives no clean overall %, so the percentage is phase-weighted and ramps with

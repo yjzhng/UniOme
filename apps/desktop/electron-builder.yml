@@ -31,14 +31,16 @@ asar: true
 mac:
   category: public.app-category.education
   icon: build-resources/icon.icns
+  # Arch is chosen on the CLI (see the dist / dist:arm64 / dist:x64 scripts) so each variant builds
+  # exactly one architecture; a target-level arch list here would override those flags.
   target:
     - target: dmg
-      arch:
-        - arm64
-        - x64
   artifactName: ${productName}-${version}-${arch}.${ext}
-  # Code-signing/notarization intentionally omitted for now — unsigned builds run via right-click →
-  # Open. To sign later: set CSC_LINK/CSC_KEY_PASSWORD + an Apple Developer ID and add notarize config.
+  # Reproducibly UNSIGNED: don't auto-sign with whatever cert happens to be on the build machine (an
+  # Apple *Development* cert is worse than unsigned for other users). Unsigned builds run via right-click
+  # → Open. To sign for real: remove `identity: null`, set CSC_LINK/CSC_KEY_PASSWORD to a Developer ID,
+  # and add a notarize step.
+  identity: null
 
 dmg:
   title: ${productName} ${version}

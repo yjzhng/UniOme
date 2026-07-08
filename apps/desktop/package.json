@@ -11,6 +11,8 @@
     "build:web": "npm run build -w @uniome/web && rm -rf build/web && cp -R ../web/dist build/web",
     "build": "node scripts/build.mjs",
     "start": "npm run build && electron .",
-    "dist": "npm run build && electron-builder --mac --config electron-builder.yml"
+    "dist": "npm run build && electron-builder --mac --arm64 --x64 --config electron-builder.yml",
+    "dist:arm64": "npm run build && electron-builder --mac --arm64 --config electron-builder.yml",
+    "dist:x64": "npm run build && electron-builder --mac --x64 --config electron-builder.yml"
   }
 }
