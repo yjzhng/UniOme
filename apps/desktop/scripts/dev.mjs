@@ -157,6 +157,13 @@ try { webUrl = await startVite(); } catch (e) { console.error('[dev]', e.message
 await waitForUniOme(webUrl);
 const electronEnv = { ...process.env, VITE_DEV_URL: webUrl };
 delete electronEnv.ELECTRON_RUN_AS_NODE; // some shells set this; it makes `electron .` run as plain node
+// Defense-in-depth: an interrupted first install leaves node_modules/electron/ without its downloaded
+// binary. launch.sh reinstalls in that case, but if dev.mjs is reached anyway, fail loudly (not a
+// silent spawn error → an app that never opens).
+if (!existsSync(resolve(repo, 'node_modules/electron/dist/Electron.app'))) {
+  console.error('[dev] Electron is not installed (node_modules/electron/dist missing) — the first-run install was likely interrupted. Relaunch UniOme.app to reinstall, or run `npm install`.');
+  shutdown(1);
+}
 const electronBin = brandedElectronBin() || bin('electron');
 const electron = spawn(electronBin, ['.'], { cwd: desktop, stdio: 'inherit', detached: true, env: electronEnv });
 children.push(electron);
