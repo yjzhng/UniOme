@@ -1,0 +1,8 @@
+{
+  "_comment": "Org-specific infra config for Campylobacter jejuni NCTC 11168 (taxid 192222). Cross-database IDs verified against KEGG/NCBI/STRING/PaxDb during AMR onboarding (see README.md for join caveats). available:false until the backend is built and the archive is hosted — then set available:true + url + bytes. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "192222",
+  "speciesTaxid": "197",
+  "refAssembly": "GCF_000009085.1",
+  "paxdbSpecies": "192222",
+  "available": false
+}

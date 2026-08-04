@@ -1,4 +1,4 @@
-import { Link, Outlet, useMatch, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChromosomeInfo, RelationshipType } from '@uniome/shared';
 import GenomeBrowser from './components/GenomeBrowser';
@@ -8,6 +8,7 @@ import { ThresholdProvider } from './lib/thresholds';
 import { FavouritesProvider, FavouriteBar } from './lib/favourites';
 import { SettingsProvider } from './lib/settings';
 import { SettingsModal } from './components/SettingsModal';
+import { useUpdateCheck } from './lib/useUpdateCheck';
 import { fetchJSONWithRetry } from './lib/api';
 
 export interface OrganismSummary {
@@ -52,6 +53,15 @@ export interface OrgHomeContext {
   setRelView: (v: RelView) => void;
 }
 
+// The organism title: the species (binomial) only, with the genus abbreviated to its initial and no
+// strain — e.g. "Pseudomonas aeruginosa" → "P. aeruginosa". Falls back to shortName if unavailable.
+function speciesTitle(o: { scientificName?: string | null; shortName?: string | null }): string {
+  const sci = (o.scientificName ?? '').trim();
+  if (!sci) return o.shortName ?? '';
+  const [genus, ...rest] = sci.split(/\s+/);
+  return rest.length ? `${genus[0]}. ${rest.join(' ')}` : genus;
+}
+
 export default function Layout() {
   const orgMatch = useMatch('/o/:taxid/c/:chrom/*');
   const taxid = orgMatch?.params.taxid;
@@ -69,6 +79,18 @@ export default function Layout() {
   const [selected, setSelected] = useState<SelectedGene | null>(null);
   const [relView, setRelView] = useState<RelView>(DEFAULT_REL_VIEW);
   const nav = useNavigate();
+
+  // Browser-style back/forward in the header (replacing the wordmark). React Router (history v6) stamps
+  // a numeric `idx` on window.history.state for each entry; we track it plus the max idx reached this
+  // session, so "back" is available whenever idx>0 and "forward" whenever we've stepped back (idx<max).
+  const location = useLocation();
+  const [hist, setHist] = useState({ idx: 0, max: 0 });
+  useEffect(() => {
+    const idx = (typeof window !== 'undefined' && (window.history.state?.idx as number)) || 0;
+    setHist((h) => ({ idx, max: Math.max(h.max, idx) }));
+  }, [location.key]);
+  const canBack = hist.idx > 0;
+  const canFwd = hist.idx < hist.max;
 
   useEffect(() => {
     fetchJSONWithRetry<OrganismSummary[]>('/api/organisms')
@@ -154,11 +176,22 @@ export default function Layout() {
   const activeChrom =
     chromosomes.find((c) => c.id === chrom) ?? chromosomes[0];
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
+  const [orgQuery, setOrgQuery] = useState(''); // filter text for the organism dropdown
+  // Filter the dropdown by short name, scientific name, or taxid (case-insensitive).
+  const orgQ = orgQuery.trim().toLowerCase();
+  const filteredOrgs = orgQ
+    ? organisms.filter((o) => `${o.shortName ?? ''} ${o.scientificName ?? ''} ${o.taxid}`.toLowerCase().includes(orgQ))
+    : organisms;
   const orgMenuRef = useRef<HTMLDivElement>(null);
   // Dark mode: toggles a `dark` class on <html> (init'd pre-render in index.html), persisted.
   const [dark, setDark] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
   const toggleDark = () => setDark((v) => { const n = !v; document.documentElement.classList.toggle('dark', n); try { localStorage.setItem('uniome.theme', n ? 'dark' : 'light'); } catch { /* ignore */ } return n; });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const update = useUpdateCheck(); // drives the notification dot on the settings gear + About section
+  // "Silence update notifications" (persisted): hides the passive dots even when an update exists.
+  const [silenced, setSilenced] = useState(() => { try { return localStorage.getItem('uniome.silenceUpdates') === '1'; } catch { return false; } });
+  const toggleSilence = () => setSilenced((v) => { const n = !v; try { localStorage.setItem('uniome.silenceUpdates', n ? '1' : '0'); } catch { /* ignore */ } return n; });
+  const showUpdateDot = update.updateAvailable && !silenced;
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (orgMenuRef.current && !orgMenuRef.current.contains(e.target as Node)) {
@@ -175,52 +208,102 @@ export default function Layout() {
     <ThresholdProvider>
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-2">
-          <Link to="/" className="font-mono text-sm font-semibold tracking-tight">
-            UniOme
-          </Link>
+        <div className="mx-auto flex h-12 max-w-7xl items-center gap-4 px-4">
+          {/* Home + back / forward navigation (replaces the wordmark). Home returns to the launch
+              page (organism list); the arrows return to the page you were just on. */}
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Link
+              to="/"
+              aria-label="home"
+              title="Return to the launch page (organism list)"
+              className="flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /></svg>
+            </Link>
+            <button
+              type="button"
+              onClick={() => nav(-1)}
+              disabled={!canBack}
+              aria-label="previous page"
+              title="Back to the previous page"
+              className="flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 disabled:cursor-default disabled:text-neutral-300 disabled:hover:bg-transparent"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => nav(1)}
+              disabled={!canFwd}
+              aria-label="next page"
+              title="Forward to the page you came back from"
+              className="flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 disabled:cursor-default disabled:text-neutral-300 disabled:hover:bg-transparent"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 18l6-6-6-6" /></svg>
+            </button>
+          </div>
           {currentOrg && (
             <div className="relative" ref={orgMenuRef}>
               <button
                 type="button"
-                onClick={() => setOrgMenuOpen((v) => !v)}
+                onClick={() => setOrgMenuOpen((v) => { if (!v) setOrgQuery(''); return !v; })}
                 className="flex cursor-pointer items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800"
               >
-                <span>{currentOrg.shortName}</span>
+                <span>{speciesTitle(currentOrg)}</span>
                 <span aria-hidden className="text-[10px]">▾</span>
               </button>
               {orgMenuOpen && (
-                <ul className="absolute left-0 z-40 mt-1 max-h-80 w-72 overflow-auto rounded border border-neutral-200 bg-white shadow-sm">
-                  {organisms.map((o) => {
-                    const first = o.chromosomes[0];
-                    const active = o.taxid === taxid;
-                    return (
-                      <li key={o.taxid}>
-                        <button
-                          type="button"
-                          disabled={!first}
-                          onClick={() => {
-                            setOrgMenuOpen(false);
-                            if (!first) return;
-                            if (o.taxid === taxid) return;
-                            nav(`/o/${o.taxid}/c/${encodeURIComponent(first.id)}`);
-                          }}
-                          className={
-                            'flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left text-xs ' +
-                            (active ? 'bg-neutral-100' : 'hover:bg-neutral-100')
-                          }
-                        >
-                          <span className={'font-mono ' + (active ? 'font-semibold text-neutral-900' : 'text-neutral-800')}>
-                            {o.shortName}
-                          </span>
-                          <span className="text-[10px] text-neutral-500">
-                            <em>{o.scientificName}</em> · {o.chromosomes.length} chrom
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div className="absolute left-0 z-40 mt-1 flex w-72 flex-col overflow-hidden rounded border border-neutral-200 bg-white shadow-sm">
+                  <div className="border-b border-neutral-100 p-1.5">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={orgQuery}
+                      onChange={(e) => setOrgQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') { setOrgMenuOpen(false); return; }
+                        if (e.key === 'Enter') {
+                          const t = filteredOrgs.find((o) => o.chromosomes[0]);
+                          if (t) { setOrgMenuOpen(false); nav(`/o/${t.taxid}/c/${encodeURIComponent(t.chromosomes[0].id)}`); }
+                        }
+                      }}
+                      placeholder="Search organisms…"
+                      className="w-full rounded bg-neutral-100 px-2 py-1 text-xs text-neutral-800 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
+                    />
+                  </div>
+                  <ul className="max-h-72 overflow-auto">
+                    {filteredOrgs.length === 0 ? (
+                      <li className="px-2 py-2 text-[11px] text-neutral-400">no matches</li>
+                    ) : filteredOrgs.map((o) => {
+                      const first = o.chromosomes[0];
+                      const active = o.taxid === taxid;
+                      return (
+                        <li key={o.taxid}>
+                          <button
+                            type="button"
+                            disabled={!first}
+                            onClick={() => {
+                              setOrgMenuOpen(false);
+                              if (!first) return;
+                              if (o.taxid === taxid) return;
+                              nav(`/o/${o.taxid}/c/${encodeURIComponent(first.id)}`);
+                            }}
+                            className={
+                              'flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left text-xs ' +
+                              (active ? 'bg-neutral-100' : 'hover:bg-neutral-100')
+                            }
+                          >
+                            <span className={'font-mono ' + (active ? 'font-semibold text-neutral-900' : 'text-neutral-800')}>
+                              {o.shortName}
+                            </span>
+                            <span className="text-[10px] text-neutral-500">
+                              <em>{o.scientificName}</em> · {o.chromosomes.length} chrom
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               )}
             </div>
           )}
@@ -250,22 +333,25 @@ export default function Layout() {
               </>
             );
           })()}
-          {taxid && <FavouriteBar onPick={selectGene} />}
+          {taxid && <FavouriteBar onPick={selectGene} taxid={taxid} />}
           {/* Persistent gene search — selects on the home page, opens on the entry page (same
               mode-aware rule as the favourites). */}
           {taxid && <div className="ml-auto shrink-0"><GeneSearch taxid={taxid} compact onPick={(g) => selectGene({ taxid, ...g })} /></div>}
           {/* Trailing controls: just the settings gear (dark mode + data toggles live inside it).
               ml-auto on the home page, where there's no search bar to push it right. */}
-          <button type="button" onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings"
-            className={'flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 ' + (taxid ? '' : 'ml-auto')}>
+          <button type="button" onClick={() => setSettingsOpen(true)} aria-label={showUpdateDot ? 'settings (update available)' : 'settings'} title={showUpdateDot ? `settings — v${update.latest} available` : 'settings'}
+            className={'relative flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 ' + (taxid ? '' : 'ml-auto')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
+            {showUpdateDot && (
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white" aria-hidden />
+            )}
           </button>
         </div>
       </header>
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} dark={dark} onToggleDark={toggleDark} />}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} dark={dark} onToggleDark={toggleDark} update={update} silenced={silenced} onToggleSilence={toggleSilence} />}
       {/* Per-gene genome-browser navigator: only on the entry page (with or without a gene selected).
           Not sticky — the sticky header above stays put while this scrolls away. Picking a feature
           opens its entry; clicking the selected one deselects → the no-gene entry view. The organism

@@ -52,8 +52,13 @@ DB_COLS = ["uniqID", "source", "species", "strain", "org", "chrom", "chrom_topo"
            "coord", "len", "seq", "rna_len", "rna_seq", "prot_len", "prot_seq"]
 
 
-def gbff_df(taxid, assembly, cache_dir, api_key):
-    """Download + parse a GBFF assembly into prokDB's source DataFrame (cached, like prokDB's `build`)."""
+def gbff_df(taxid, assembly, cache_dir, api_key, acc=None):
+    """Download + parse a GBFF assembly into prokDB's source DataFrame (cached, like prokDB's `build`).
+
+    `acc` pins an explicit assembly accession (GCF_/GCA_), bypassing the taxid-based
+    `get_reference_accession` resolver. Needed for strains whose taxid has no NCBI-designated
+    reference (so the resolver would pick a different isolate) — the pin comes from the org's
+    `organism.json` `refAssembly`. When `acc` is None, behaviour is unchanged."""
     os.makedirs(cache_dir, exist_ok=True)
     gbf = os.path.join(cache_dir, f"{taxid}_{assembly}.gbff")
     if os.path.exists(gbf):
@@ -61,21 +66,28 @@ def gbff_df(taxid, assembly, cache_dir, api_key):
         with open(gbf, "rb") as fh:
             data = fh.read()
     else:
-        acc = get_reference_accession(taxid, ASSEMBLY_SOURCE_MAP[assembly], api_key)
+        if acc is None:
+            acc = get_reference_accession(taxid, ASSEMBLY_SOURCE_MAP[assembly], api_key)
         data = extract_gbff(download_gbff(acc, api_key))
         with open(gbf, "wb") as fh:
             fh.write(data)
     return parse_gbff(data)
 
 
-def up_df_cached(taxid, cache_dir):
-    """Fetch UniProt (cached as CSV so re-runs are cheap)."""
+def up_df_cached(taxid, cache_dir, up_taxid=None):
+    """Fetch UniProt (cached as CSV so re-runs are cheap).
+
+    `up_taxid` overrides the organism id queried when UniProt files a strain's proteome under a
+    different taxid than the NCBI genome taxid (e.g. Typhi CT18 genome 220341 but proteome 90370).
+    Over-broad (species/serovar) proteomes are fine — UniOme drops UP-only rows at ingest. When
+    `up_taxid` is None, behaviour is unchanged."""
     os.makedirs(cache_dir, exist_ok=True)
-    up_csv = os.path.join(cache_dir, f"{taxid}_UP.csv")
+    query_taxid = up_taxid or taxid
+    up_csv = os.path.join(cache_dir, f"{query_taxid}_UP.csv")
     if os.path.exists(up_csv):
         print(f"Using cached UniProt: {up_csv}")
         return pd.read_csv(up_csv)
-    df = fetch_uniprot(taxid)
+    df = fetch_uniprot(query_taxid)
     df.to_csv(up_csv, index=False)
     return df
 
@@ -119,17 +131,20 @@ def main():
     ap.add_argument("--out", required=True, help="working DB CSV to write")
     ap.add_argument("--cache", help="cache dir for GBFF/UniProt (default: <out dir>/_enrich_cache)")
     ap.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"))
+    ap.add_argument("--rs-acc", help="pin the RefSeq (GCF_) assembly accession (bypass taxid resolver)")
+    ap.add_argument("--gb-acc", help="pin the GenBank (GCA_) assembly accession (bypass taxid resolver)")
+    ap.add_argument("--up-taxid", help="override the UniProt organism taxid (proteome filed under a different taxid)")
     args = ap.parse_args()
 
     cache = args.cache or os.path.join(os.path.dirname(os.path.abspath(args.out)), "_enrich_cache")
     log = {"record": [], "result": [], "edge": [], "summary": []}
 
     print("Fetching genome (RefSeq) ...")
-    rs_df = gbff_df(args.tax_id, "RS", cache, args.api_key)
+    rs_df = gbff_df(args.tax_id, "RS", cache, args.api_key, acc=args.rs_acc)
     print("Fetching genome (GenBank) ...")
-    gb_df = gbff_df(args.tax_id, "GB", cache, args.api_key)
+    gb_df = gbff_df(args.tax_id, "GB", cache, args.api_key, acc=args.gb_acc)
     print("Fetching UniProt ...")
-    up_df = up_df_cached(args.tax_id, cache)
+    up_df = up_df_cached(args.tax_id, cache, up_taxid=args.up_taxid)
 
     core = pd.read_csv(args.core, dtype=str).fillna("")
     out = enrich(core, rs_df, gb_df, up_df, log)

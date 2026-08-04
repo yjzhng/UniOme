@@ -74,6 +74,12 @@ export function NoData() {
   );
 }
 
+// Shown while a field's own fetch is still in flight — distinct from NoData (which means the fetch
+// resolved with nothing), so a slow-loading field reads as "loading…" rather than "no data".
+export function Loading() {
+  return <span className="animate-pulse text-xs italic text-neutral-400" title="loading…">loading…</span>;
+}
+
 // A full-width box sized to match the content that will replace it, so a graphical section keeps the
 // SAME footprint whether it's loading, empty (poorly-annotated gene), or rendered — no layout shift,
 // and the page above the scroll anchor stays put. Pass a px `height` or a Tailwind `heightClass`

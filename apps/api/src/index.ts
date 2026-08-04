@@ -3,8 +3,9 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import { getOrganism, listOrganisms } from './organisms.js';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { resourcesRoot } from './resources.js';
 import {
   loadProteinDomains,
   loadProteinInterpro,
@@ -49,6 +50,15 @@ app.get('/api/organisms', async () => listOrganisms());
 
 // Catalog: every downloadable organism + whether its data is already present (with chromosome info
 // for present ones, so the home page can render and link them without a second call).
+// When this install's copy of an organism's data was obtained — from the download stamp
+// (.uniome-data.json), else the folder's mtime as a fallback. Compared client-side against the
+// release asset's updatedAt to flag a data update. null if the folder isn't present.
+function orgDataDate(folder: string): string | null {
+  const dir = join(resourcesRoot(), folder);
+  try { const m = JSON.parse(readFileSync(join(dir, '.uniome-data.json'), 'utf8')); if (m?.downloadedAt) return m.downloadedAt; } catch { /* no stamp */ }
+  try { return statSync(dir).mtime.toISOString(); } catch { return null; }
+}
+
 app.get('/api/catalog', async () => {
   const present = new Map(listOrganisms().map((o) => [o.taxid, o]));
   const seen = new Set<string>();
@@ -62,6 +72,10 @@ app.get('/api/catalog', async () => {
       nickname: e.nickname ?? null,
       keggid: e.keggid ?? null,
       name: e.name ?? null, // registry label shown before download
+      amr: e.amr ?? null,   // AMR priority level (critical|high|medium|model) — home-page grouping
+      gram: e.gram ?? null, // Gram stain (positive|negative) — home-page grouping
+      folder: e.folder,     // matches the release asset name <folder>.tar.gz
+      dataDate: p ? orgDataDate(e.folder) : null, // when this install got the data (ready orgs only)
       status,
       // Display metadata is DB-derived — only known once the organism is present (ready).
       shortName: p?.shortName ?? null,
@@ -73,7 +87,7 @@ app.get('/api/catalog', async () => {
   });
   for (const o of present.values()) {
     if (seen.has(o.taxid)) continue; // present but not catalogued (e.g. manually dropped in)
-    out.push({ taxid: o.taxid, nickname: null, keggid: null, name: null, status: 'ready', shortName: o.shortName, scientificName: o.scientificName, strain: o.strain, bytes: null, chromosomes: o.chromosomes });
+    out.push({ taxid: o.taxid, nickname: null, keggid: null, name: null, amr: null, gram: null, folder: o.taxid, dataDate: orgDataDate(o.taxid), status: 'ready', shortName: o.shortName, scientificName: o.scientificName, strain: o.strain, bytes: null, chromosomes: o.chromosomes });
   }
   return out;
 });

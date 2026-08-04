@@ -1,0 +1,8 @@
+{
+  "_comment": "Org-specific infra config for Pseudomonas aeruginosa PAO1 (taxid 208964). Cross-database IDs verified against KEGG/NCBI/STRING/PaxDb during AMR onboarding (see README.md for join caveats). available:false until the backend is built and the archive is hosted — then set available:true + url + bytes. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "208964",
+  "speciesTaxid": "287",
+  "refAssembly": "GCF_000006765.1",
+  "paxdbSpecies": "208964",
+  "available": false
+}

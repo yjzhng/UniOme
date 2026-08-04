@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { ChromosomeInfo } from '@uniome/shared';
 import type { Coverage } from '@uniome/shared';
@@ -6,6 +6,7 @@ import { fetchJSONWithRetry } from '../lib/api';
 import { OrganismGlyph } from '../components/OrganismGlyph';
 import { DataUseModal, hasAcceptedDataUse, LEGAL_ROUTE } from '../components/DataUseNotice';
 import { ScoreRing, overallCoverageScore } from '../modules/CoverageHeatmap';
+import { useOrgDownload, ProgressBar, mb } from '../lib/orgDownload';
 
 // One row of /api/catalog. `status` drives the tile:
 //   ready     → data on disk, links into the organism page (carries its chromosomes)
@@ -18,6 +19,8 @@ interface CatalogOrg {
   nickname: string | null;
   keggid: string | null;
   name: string | null;
+  amr: string | null;  // AMR priority level: critical | high | medium | model
+  gram: string | null; // Gram stain: positive | negative
   status: 'ready' | 'available' | 'planned';
   shortName: string | null;
   scientificName: string | null;
@@ -28,6 +31,37 @@ interface CatalogOrg {
 
 // Label before the DB exists: the registry name, else the nickname, else the taxid.
 const seedLabel = (o: CatalogOrg) => o.name || o.nickname || `taxid ${o.taxid}`;
+
+// Home hierarchy: two sections — Model species (top), then AMR pathogens grouped by priority tier
+// (Critical/High/Medium), each split into Gram-negative / Gram-positive subgroups. Anything without a
+// recognised pathogen tier is a model/reference strain. Gram-unknown tiles sort last.
+const PATHOGEN_TIERS = ['critical', 'high', 'medium'] as const;
+const TIER_LABEL: Record<string, string> = { critical: 'Critical priority', high: 'High priority', medium: 'Medium priority' };
+const GRAM_ORDER = ['negative', 'positive', 'other'] as const;
+const GRAM_LABEL: Record<string, string> = { negative: 'Gram-negative', positive: 'Gram-positive', other: 'Other' };
+const tierKey = (o: CatalogOrg) => (o.amr && (PATHOGEN_TIERS as readonly string[]).includes(o.amr) ? o.amr : 'model');
+const gramKey = (o: CatalogOrg) => (o.gram === 'positive' ? 'positive' : o.gram === 'negative' ? 'negative' : 'other');
+const byLabel = (a: CatalogOrg, b: CatalogOrg) => (a.shortName ?? seedLabel(a)).localeCompare(b.shortName ?? seedLabel(b));
+
+// One priority tier's tiles, split into Gram subgroups.
+function GramGrid({ orgs, onDownloaded, guardDownload }: { orgs: CatalogOrg[]; onDownloaded: () => void; guardDownload: (start: () => void) => void }) {
+  return (
+    <>
+      {GRAM_ORDER.map((gram) => {
+        const inGram = orgs.filter((o) => gramKey(o) === gram).sort(byLabel);
+        if (inGram.length === 0) return null;
+        return (
+          <div key={gram} className="space-y-2">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">{GRAM_LABEL[gram]}</div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {inGram.map((o) => <OrganismTile key={o.taxid} org={o} onDownloaded={onDownloaded} guardDownload={guardDownload} />)}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
 
 export default function HomePage() {
   const [orgs, setOrgs] = useState<CatalogOrg[] | null>(null);
@@ -61,10 +95,38 @@ export default function HomePage() {
       ) : orgs.length === 0 ? (
         <div className="text-sm text-neutral-500">no organisms available</div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {orgs.map((o) => (
-            <OrganismTile key={o.taxid} org={o} onDownloaded={refresh} guardDownload={guardDownload} />
-          ))}
+        <div className="space-y-10">
+          {(() => {
+            const model = orgs.filter((o) => tierKey(o) === 'model').sort(byLabel);
+            const pathogens = orgs.filter((o) => tierKey(o) !== 'model');
+            return (
+              <>
+                {model.length > 0 && (
+                  <section className="space-y-3">
+                    <h2 className="border-b border-neutral-300 pb-1 font-mono text-base font-semibold text-neutral-900">Model species</h2>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {model.map((o) => <OrganismTile key={o.taxid} org={o} onDownloaded={refresh} guardDownload={guardDownload} />)}
+                    </div>
+                  </section>
+                )}
+                {pathogens.length > 0 && (
+                  <section className="space-y-5">
+                    <h2 className="border-b border-neutral-300 pb-1 font-mono text-base font-semibold text-neutral-900">AMR pathogens</h2>
+                    {PATHOGEN_TIERS.map((tier) => {
+                      const inTier = pathogens.filter((o) => tierKey(o) === tier);
+                      if (inTier.length === 0) return null;
+                      return (
+                        <div key={tier} className="space-y-3">
+                          <h3 className="font-mono text-sm font-semibold text-neutral-700">{TIER_LABEL[tier]}</h3>
+                          <GramGrid orgs={inTier} onDownloaded={refresh} guardDownload={guardDownload} />
+                        </div>
+                      );
+                    })}
+                  </section>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -86,8 +148,6 @@ export default function HomePage() {
   );
 }
 
-const mb = (b: number) => `${(b / 1_000_000).toFixed(0)} MB`;
-
 function OrganismTile({ org, onDownloaded, guardDownload }: { org: CatalogOrg; onDownloaded: () => void; guardDownload: (start: () => void) => void }) {
   if (org.status === 'ready') return <PresentTile org={org} />;
   if (org.status === 'available') return <DownloadTile org={org} onDownloaded={onDownloaded} guardDownload={guardDownload} />;
@@ -108,7 +168,7 @@ function PlannedTile({ org }: { org: CatalogOrg }) {
     <div className="flex items-center gap-4 rounded border border-dashed border-neutral-200 bg-neutral-50 p-4 opacity-70">
       <OrganismGlyph taxid={org.taxid} className="h-16 w-16 shrink-0 text-neutral-300" />
       <div className="min-w-0">
-        <div className="font-mono text-base font-semibold text-neutral-500">{seedLabel(org)}</div>
+        <div className="font-mono text-base font-semibold text-neutral-500 [word-spacing:-0.2em]">{seedLabel(org)}</div>
         <SeedMeta org={org} />
         <div className="mt-2">
           <span className="inline-block rounded bg-neutral-200 px-2 py-1 text-xs font-medium text-neutral-500">
@@ -143,7 +203,7 @@ function PresentTile({ org }: { org: CatalogOrg }) {
     >
       <OrganismGlyph taxid={org.taxid} className="h-16 w-16 shrink-0 text-neutral-400 transition-colors group-hover:text-neutral-700" />
       <div className="min-w-0 flex-1">
-        <div className="font-mono text-base font-semibold text-neutral-900">{org.shortName ?? seedLabel(org)}</div>
+        <div className="font-mono text-base font-semibold text-neutral-900 [word-spacing:-0.2em]">{org.shortName ?? seedLabel(org)}</div>
         <div className="text-sm text-neutral-700">
           <em>{org.scientificName}</em> {org.strain}
         </div>
@@ -168,39 +228,15 @@ function PresentTile({ org }: { org: CatalogOrg }) {
   );
 }
 
-interface Progress { phase: 'downloading' | 'extracting' | 'done' | 'error'; received: number; total: number; message?: string }
-
 function DownloadTile({ org, onDownloaded, guardDownload }: { org: CatalogOrg; onDownloaded: () => void; guardDownload: (start: () => void) => void }) {
-  const [progress, setProgress] = useState<Progress | null>(null);
-  const esRef = useRef<EventSource | null>(null);
-
-  useEffect(() => () => esRef.current?.close(), []); // close the stream on unmount
-
-  const start = () => {
-    setProgress({ phase: 'downloading', received: 0, total: org.bytes ?? 0 });
-    fetch(`/api/organism/${org.taxid}/download`, { method: 'POST' }).catch(() => {});
-    const es = new EventSource(`/api/organism/${org.taxid}/download/events`);
-    esRef.current = es;
-    es.onmessage = (e) => {
-      let p: Progress;
-      try { p = JSON.parse(e.data) as Progress; } catch { return; }
-      setProgress(p);
-      if (p.phase === 'done') { es.close(); onDownloaded(); }       // tile flips to "present"
-      else if (p.phase === 'error') es.close();
-    };
-    es.onerror = () => { es.close(); setProgress((p) => p ?? { phase: 'error', received: 0, total: 0, message: 'connection lost' }); };
-  };
-
-  const pct = progress && progress.total > 0 ? Math.min(100, (progress.received / progress.total) * 100) : null;
-  const downloading = progress?.phase === 'downloading';
-  const extracting = progress?.phase === 'extracting';
+  const { progress, start } = useOrgDownload(org.taxid, org.bytes, onDownloaded);
   const errored = progress?.phase === 'error';
 
   return (
     <div className="flex items-center gap-4 rounded border border-dashed border-neutral-300 bg-neutral-50 p-4">
       <OrganismGlyph taxid={org.taxid} className="h-16 w-16 shrink-0 text-neutral-400" />
       <div className="min-w-0 flex-1">
-        <div className="font-mono text-base font-semibold text-neutral-700">{seedLabel(org)}</div>
+        <div className="font-mono text-base font-semibold text-neutral-700 [word-spacing:-0.2em]">{seedLabel(org)}</div>
         <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
           <span>taxid {org.taxid}</span>
           {org.keggid && <span>KEGG {org.keggid}</span>}
@@ -220,23 +256,7 @@ function DownloadTile({ org, onDownloaded, guardDownload }: { org: CatalogOrg; o
             {errored && <div className="mt-1.5 text-xs text-red-600">{progress?.message || 'download failed'}</div>}
           </>
         ) : (
-          <div className="space-y-1">
-            <div className="h-1.5 w-full overflow-hidden rounded bg-neutral-200">
-              <div
-                className={'h-full bg-neutral-800 transition-[width] duration-200 ' + (extracting && pct == null ? 'animate-pulse w-full' : '')}
-                style={pct != null ? { width: `${pct}%` } : undefined}
-              />
-            </div>
-            <div className="text-xs text-neutral-500">
-              {downloading
-                ? (pct != null
-                    ? `Downloading… ${mb(progress!.received)} / ${mb(progress!.total)} (${pct.toFixed(0)}%)`
-                    : `Downloading… ${mb(progress!.received)}`)
-                : extracting
-                  ? 'Extracting…'
-                  : 'Done'}
-            </div>
-          </div>
+          <ProgressBar progress={progress} />
         )}
         </div>
       </div>

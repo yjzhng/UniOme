@@ -1,0 +1,8 @@
+{
+  "_comment": "Org-specific infra config for Streptococcus pneumoniae R6 (taxid 171101). Cross-database IDs verified against KEGG/NCBI/STRING/PaxDb during AMR onboarding (see README.md for join caveats). available:false until the backend is built and the archive is hosted — then set available:true + url + bytes. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "171101",
+  "speciesTaxid": "1313",
+  "refAssembly": "GCF_000007045.1",
+  "paxdbSpecies": "171101",
+  "available": false
+}

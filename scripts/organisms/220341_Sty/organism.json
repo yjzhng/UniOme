@@ -1,0 +1,7 @@
+{
+  "_comment": "Org-specific infra config for Salmonella enterica serovar Typhi CT18 (taxid 220341). Cross-database IDs verified against KEGG/NCBI/STRING/PaxDb during AMR onboarding (see README.md for join caveats). available:false until the backend is built and the archive is hosted — then set available:true + url + bytes. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "220341",
+  "speciesTaxid": "28901",
+  "refAssembly": "GCF_000195995.1",
+  "available": false
+}

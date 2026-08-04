@@ -1,4 +1,4 @@
-import { createReadStream, createWriteStream, mkdirSync, rmSync, statSync } from 'node:fs';
+import { createReadStream, createWriteStream, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
@@ -92,6 +92,9 @@ export async function startDownload(taxid: string): Promise<void> {
     emit({ taxid, phase: 'extracting', received: known, total: known });
     await extractTarGz(tarFile, root); // archive contains <folder>/… → resources/<folder>/
     rmSync(tarFile, { force: true });
+    // Stamp when this copy was downloaded, so the app can tell whether the Release has newer data
+    // since (compared against the release asset's updatedAt). Non-fatal if it can't be written.
+    try { writeFileSync(resolve(root, entry.folder, '.uniome-data.json'), JSON.stringify({ downloadedAt: new Date().toISOString() })); } catch { /* ignore */ }
     emit({ taxid, phase: 'done', received: known, total: known });
   } catch (err) {
     rmSync(tarFile, { force: true }); // drop a partial archive so a retry starts clean

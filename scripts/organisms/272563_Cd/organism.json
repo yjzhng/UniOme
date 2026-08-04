@@ -1,0 +1,7 @@
+{
+  "_comment": "Org-specific infra config for Clostridioides difficile 630 (taxid 272563). Cross-database IDs verified against KEGG/NCBI/STRING/PaxDb during AMR onboarding (see README.md for join caveats). available:false until the backend is built and the archive is hosted — then set available:true + url + bytes. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "272563",
+  "speciesTaxid": "1496",
+  "refAssembly": "GCF_000009205.2",
+  "available": false
+}

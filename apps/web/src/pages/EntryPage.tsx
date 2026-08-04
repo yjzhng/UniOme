@@ -9,7 +9,7 @@ import { InteractionNetwork } from '../modules/InteractionNetwork';
 import { SharedNetwork } from '../modules/SharedNetwork';
 import { PathwaySection } from '../modules/OverviewMap';
 import { kgpcColor, NET_PLACEHOLDER_H } from '../modules/networkParts';
-import { ACCENT, ACCENT_CHIP, THEME_CHIP, Breadcrumb, Field, InfoTip, LoadingBox, NoData, Placeholder, Section } from '../components/Fields';
+import { ACCENT, ACCENT_CHIP, THEME_CHIP, Breadcrumb, Field, InfoTip, Loading, LoadingBox, NoData, Placeholder, Section } from '../components/Fields';
 import { SOURCE_INFO, useSourceInfo } from '../sourceInfo';
 import { useFavourites } from '../lib/favourites';
 import { useSettings } from '../lib/settings';
@@ -81,10 +81,10 @@ function EntryView({ id, taxid, chrom, active, setSelected }: { id: string; taxi
   const [feature, setFeature] = useState<Feature | null>(null);
   // `undefined` = still loading (→ placeholder), `null` = loaded but no data / 404 (→ "no data").
   const [related, setRelated] = useState<RelatedData | null | undefined>(undefined);
-  const [interactions, setInteractions] = useState<Interactions | null>(null);
-  const [regulation, setRegulation] = useState<Regulation | null>(null);
+  const [interactions, setInteractions] = useState<Interactions | null | undefined>(undefined);
+  const [regulation, setRegulation] = useState<Regulation | null | undefined>(undefined);
   const [shared, setShared] = useState<SharedRelationships | null | undefined>(undefined);
-  const [similar, setSimilar] = useState<SimilarData | null>(null);
+  const [similar, setSimilar] = useState<SimilarData | null | undefined>(undefined);
   const [siblings, setSiblings] = useState<Feature[]>([]);
   const [notFound, setNotFound] = useState(false);
   const { enabled } = useSettings(); // which annotation sections/fields to show (Settings window)
@@ -611,7 +611,7 @@ function GeneralSection({ feature: f }: { feature: Feature }) {
 
 // Regulation as its own panel (below General): operon/regulon/sigmulon/modulon membership + the
 // regulatory map. Lifted out of the DNA-level section so it's always visible, not level-gated.
-function RegulationSection({ feature: f, regulation, chrom }: { feature: Feature; regulation: Regulation | null; chrom: string }) {
+function RegulationSection({ feature: f, regulation, chrom }: { feature: Feature; regulation: Regulation | null | undefined; chrom: string }) {
   const { taxid } = useParams<{ taxid: string }>();
   const { enabled } = useSettings();
   // The -on memberships (tighter label column + wider inter-column gaps for breathing room). Passed
@@ -670,9 +670,10 @@ function DnaSection({ feature: f, carried }: { feature: Feature; carried: Region
 // Sigmulon = the σ factor(s) transcribing this gene, as blue chips matching the σ-factor boxes on
 // the regulatory map (σ notation, sky styling). Links to the σ factor's own gene entry.
 const SIGMA_CHIP = 'rounded px-1.5 py-0.5 text-xs ' + ACCENT_CHIP.indigo;
-function SigmulonField({ regulation, chrom }: { regulation: Regulation | null; chrom: string }) {
+function SigmulonField({ regulation, chrom }: { regulation: Regulation | null | undefined; chrom: string }) {
   const { taxid } = useParams<{ taxid: string }>();
   const info = useSourceInfo();
+  if (regulation === undefined) return <Field label="sigmulon" info={info('regulation')} value={<Loading />} />;
   if (!regulation || regulation.sigmulons.length === 0) return <Field label="sigmulon" info={info('regulation')} value={<NoData />} />;
   return (
     <Field label="sigmulon" info={info('regulation')} value={
@@ -708,9 +709,10 @@ type RegRec = { name: string; uniqID: string | null; link: string | null; type?:
 // REGULON membership = the distinct regulators acting on this gene (from regulatedBy), as effect-
 // coloured chips. Split into gene-encoded regulators that link to their own entry (protein TF / sRNA)
 // vs. regulators with no gene to map to (small molecules like ppGpp, complexes, or unresolved names).
-function RegulonField({ regulation, chrom }: { regulation: Regulation | null; chrom: string }) {
+function RegulonField({ regulation, chrom }: { regulation: Regulation | null | undefined; chrom: string }) {
   const { taxid } = useParams<{ taxid: string }>();
   const info = useSourceInfo();
+  if (regulation === undefined) return <Field label="regulon" info={info('regulation')} value={<Loading />} />;
   if (!regulation) return <Field label="regulon" info={info('regulation')} value={<NoData />} />;
   const byName = new Map<string, RegRec>();
   for (const e of regulation.regulatedBy) {
@@ -747,11 +749,12 @@ function RegulonField({ regulation, chrom }: { regulation: Regulation | null; ch
 }
 
 // A DNA-panel "-on" membership field: the -on NAME(s) only, as source-DB entry links.
-// `entries` is null while loading; both null and an empty array render the shared "no data" state.
-function OnNameField({ label, entries }: { label: string; entries: { name: string; link: string | null; title?: string }[] | null | false }) {
+// `entries` is undefined while the regulation bundle is still loading (→ "loading…"); null or an empty
+// array means loaded-with-nothing (→ shared "no data").
+function OnNameField({ label, entries }: { label: string; entries: { name: string; link: string | null; title?: string }[] | null | undefined | false }) {
   const info = useSourceInfo();
-  if (!entries) return <Field label={label} info={info('regulation')} value={<NoData />} />;
-  if (entries.length === 0) return <Field label={label} info={info('regulation')} value={<NoData />} />;
+  if (entries === undefined) return <Field label={label} info={info('regulation')} value={<Loading />} />;
+  if (!entries || entries.length === 0) return <Field label={label} info={info('regulation')} value={<NoData />} />;
   return (
     <Field
       label={label}
@@ -767,7 +770,7 @@ function OnNameField({ label, entries }: { label: string; entries: { name: strin
   );
 }
 
-function RelationshipsSection({ feature, related, interactions, regulation, shared, similar, chrom }: { feature: Feature; related: RelatedData | null | undefined; interactions: Interactions | null; regulation: Regulation | null; shared: SharedRelationships | null | undefined; similar: SimilarData | null; chrom: string }) {
+function RelationshipsSection({ feature, related, interactions, regulation, shared, similar, chrom }: { feature: Feature; related: RelatedData | null | undefined; interactions: Interactions | null | undefined; regulation: Regulation | null | undefined; shared: SharedRelationships | null | undefined; similar: SimilarData | null | undefined; chrom: string }) {
   // The final functional product decides which structural rows are relevant: protein entries
   // show domains/motif, RNA entries show family. (DNA-only features show neither.)
   const levels = typeLevels(feature.type);
@@ -779,8 +782,8 @@ function RelationshipsSection({ feature, related, interactions, regulation, shar
     { title: 'Molecular features', node: (
       <div className="space-y-3">
         <SharedDomainField feature={feature} product={product} shared={shared} chrom={chrom} />
-        <SimilarField label="similar sequence" members={similar?.sequence ?? null} chrom={chrom} metric="identity" />
-        <SimilarField label="similar structure" members={similar?.structural ?? null} chrom={chrom} metric="tmscore" />
+        <SimilarField label="similar sequence" members={similar === undefined ? undefined : (similar?.sequence ?? null)} chrom={chrom} metric="identity" />
+        <SimilarField label="similar structure" members={similar === undefined ? undefined : (similar?.structural ?? null)} chrom={chrom} metric="tmscore" />
       </div>
     ) },
     { title: 'Regulation', node: (
@@ -986,10 +989,12 @@ function RelGrid({ groups, cap = 40, labelCol = 'minmax(0, 10rem)' }: { groups: 
 // Within-genome similarity (sequence / structure) as a table: each hit's similarity metric
 // (% identity / TM-score) alongside what it actually does — KEGG class swatch + lowest-level
 // pathway and function terms — so paralogs sharing a fold but a different role are easy to spot.
-function SimilarField({ label, members, chrom, metric }: { label: string; members: SimilarMember[] | null; chrom: string; metric: 'identity' | 'tmscore' }) {
+function SimilarField({ label, members, chrom, metric }: { label: string; members: SimilarMember[] | null | undefined; chrom: string; metric: 'identity' | 'tmscore' }) {
   const { taxid } = useParams<{ taxid: string }>();
   const info = metric === 'identity' ? SOURCE_INFO.seqSimilarity : SOURCE_INFO.structSimilarity;
-  // Both similarity sources are wired (sequence = BLAST, structural = Foldseek) → absent is "no data".
+  // Both similarity sources are wired (sequence = BLAST, structural = Foldseek): undefined = still
+  // fetching (→ "loading…"), null/empty = loaded with no hits (→ "no data").
+  if (members === undefined) return <Field label={label} info={info} value={<Loading />} />;
   if (members === null || members.length === 0) return <Field label={label} info={info} value={<NoData />} />;
   const metricHead = metric === 'identity' ? 'identity' : 'TM-score';
   return (
@@ -1032,11 +1037,12 @@ function SimilarField({ label, members, chrom, metric }: { label: string; member
 
 // Interactions = molecular only (STRING): physical (experimental/curated) vs predicted, on
 // separate rows. Score shown on hover; partners with a uniqID link to their entry.
-function InteractionsField({ interactions, chrom }: { interactions: Interactions | null; chrom: string }) {
+function InteractionsField({ interactions, chrom }: { interactions: Interactions | null | undefined; chrom: string }) {
   // The molecular-interaction network. Rendered full-width (label on its own line) rather than in the
-  // narrow label/value column, so the network + table have room. Same footprint when there are no
-  // interactions (a same-size placeholder box), so the section is consistent across genes. (The
-  // endpoint 404s → `interactions` null for no-data; a static box covers both that and the brief load.)
+  // narrow label/value column, so the network + table have room. Same footprint whether loading, empty,
+  // or rendered (a same-size box), so the section is consistent across genes. undefined = still fetching
+  // (pulsing "loading…"); null / no partners (endpoint 404s) = loaded with nothing ("no interactions").
+  const loading = interactions === undefined;
   const empty = !interactions || interactions.partners.length === 0;
   return (
     <div className="space-y-1 pt-1">
@@ -1044,7 +1050,9 @@ function InteractionsField({ interactions, chrom }: { interactions: Interactions
         interactions
         <InfoTip text={SOURCE_INFO.interactionsProtein} />
       </div>
-      {empty
+      {loading
+        ? <LoadingBox label="loading interactions…" height={NET_PLACEHOLDER_H} />
+        : empty
         ? <LoadingBox loading={false} label="no interactions" height={NET_PLACEHOLDER_H} />
         : <InteractionNetwork uniqID={interactions.uniqID} chrom={chrom} />}
     </div>
@@ -1065,9 +1073,10 @@ function splitByFunction(edges: Regulation['regulatedBy']) {
   }
   return { act, rep, other };
 }
-function RegulationField({ regulation, chrom }: { regulation: Regulation | null; chrom: string }) {
+function RegulationField({ regulation, chrom }: { regulation: Regulation | null | undefined; chrom: string }) {
   const { taxid } = useParams<{ taxid: string }>();
   const info = useSourceInfo();
+  if (regulation === undefined) return <Field label="transcriptional factors" info={info('regulation')} value={<Loading />} />;
   if (!regulation || (regulation.regulatedBy.length === 0 && regulation.sigmulons.length === 0 && regulation.modulons.length === 0)) {
     return <Field label="transcriptional factors" info={info('regulation')} value={<NoData />} />;
   }

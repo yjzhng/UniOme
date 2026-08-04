@@ -44,8 +44,8 @@ def get_reference_accession(tax_id: str, assembly_source: str, api_key: str | No
 
     query_tiers = [
         {"filters.reference_only": "true",               "label": "reference"},
-        {"filters.assembly_level": "Complete Genome",    "label": "complete genome"},
-        {"filters.assembly_level": "Chromosome",         "label": "chromosome-level"},
+        {"filters.assembly_level": "COMPLETE_GENOME",    "label": "complete genome"},
+        {"filters.assembly_level": "CHROMOSOME",         "label": "chromosome-level"},
     ]
 
     report = None
@@ -231,7 +231,13 @@ def parse_gbff(gbff_bytes: bytes) -> pd.DataFrame:
                 skipped += 1
                 continue
 
-            locus_tag = locus_tag_list[0]
+            # Prefer old_locus_tag as canonical when RefSeq has reannotated the primary
+            # locus_tag to the systematic _RS##### scheme (e.g. KPN_RS00005 with
+            # old_locus_tag=KPN_00001). The original tag is what GenBank, KEGG, STRING,
+            # UniProt and PaxDb all key on, so using it keeps RS↔GB↔annotation joins aligned
+            # and avoids duplicate rows. Non-reannotated genomes have no old_locus_tag → unchanged.
+            old_locus_tag_list = qualifiers.get("old_locus_tag")
+            locus_tag = (old_locus_tag_list[0] if old_locus_tag_list else locus_tag_list[0])
 
             gene_id = ""
             for xref in qualifiers.get("db_xref", []):

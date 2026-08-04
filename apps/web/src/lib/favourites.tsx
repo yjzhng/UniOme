@@ -1,19 +1,30 @@
 import { createContext, Fragment, useContext, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// A small persistent set of favourite genes (max 10), shown as chips in the title-bar favourite bar
-// and toggled by the star button on an entry page. Identity = taxid + uniqID; chrom + gene are kept
-// for navigation + the chip label.
+// A small persistent set of favourite genes, shown as chips in the title-bar favourite bar and toggled
+// by the star button on an entry page. Identity = taxid + uniqID; chrom + gene are kept for navigation
+// + the chip label. Favourites are **organism-specific** (the bar shows only the current organism's,
+// and the max applies per organism) and **persist between sessions** (one localStorage list holds
+// every organism's favourites; the bar filters by taxid).
 export type Fav = { taxid: string; chrom: string; uniqID: string; gene: string };
-export const FAV_MAX = 8;
+export const FAV_MAX = 8; // per organism
 const KEY = 'uniome.favourites';
 const same = (a: { taxid: string; uniqID: string }, taxid: string, uniqID: string) => a.taxid === taxid && a.uniqID === uniqID;
 
-type Ctx = { favs: Fav[]; has: (taxid: string, uniqID: string) => boolean; toggle: (f: Fav) => void; remove: (taxid: string, uniqID: string) => void; move: (from: number, to: number) => void; clear: () => void; full: boolean };
+type Ctx = {
+  favs: Fav[]; // all organisms' favourites (unfiltered); callers filter by taxid via forOrg
+  forOrg: (taxid: string) => Fav[]; // this organism's favourites, in order
+  has: (taxid: string, uniqID: string) => boolean;
+  toggle: (f: Fav) => void;
+  remove: (taxid: string, uniqID: string) => void;
+  move: (taxid: string, from: number, to: number) => void; // reorder within one organism's chips
+  clear: (taxid: string) => void; // clear only this organism's favourites
+  full: boolean;
+};
 const C = createContext<Ctx | null>(null);
 
 function load(): Fav[] {
-  try { const a = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(a) ? a.slice(0, FAV_MAX) : []; } catch { return []; }
+  try { const a = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(a) ? a : []; } catch { return []; }
 }
 
 export function FavouritesProvider({ children }: { children: ReactNode }) {
@@ -21,27 +32,32 @@ export function FavouritesProvider({ children }: { children: ReactNode }) {
   const [full, setFull] = useState(false); // 0.5s "bar is full" flash when an add is rejected
   const flashTimer = useRef<number | null>(null);
   const save = (next: Fav[]) => { setFavs(next); try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ } };
+  const forOrg = (taxid: string) => favs.filter((f) => f.taxid === taxid);
   const has = (taxid: string, uniqID: string) => favs.some((f) => same(f, taxid, uniqID));
   const toggle = (f: Fav) => {
     if (favs.some((x) => same(x, f.taxid, f.uniqID))) save(favs.filter((x) => !same(x, f.taxid, f.uniqID)));
-    else if (favs.length < FAV_MAX) save([...favs, f]);
+    else if (forOrg(f.taxid).length < FAV_MAX) save([...favs, f]); // per-organism limit
     else { setFull(true); if (flashTimer.current) clearTimeout(flashTimer.current); flashTimer.current = window.setTimeout(() => setFull(false), 500); } // full → flash, don't add
   };
   const remove = (taxid: string, uniqID: string) => save(favs.filter((x) => !same(x, taxid, uniqID)));
-  // Reorder: pull the chip at `from` and re-insert it at `to` (drag-reorder in the bar).
-  const move = (from: number, to: number) => {
-    if (from === to || from < 0 || to < 0 || from >= favs.length || to >= favs.length) return;
+  // Reorder within one organism's chips: `from`/`to` index into that organism's filtered list; we map
+  // them back to the global slots that organism occupies so other organisms' order is untouched.
+  const move = (taxid: string, from: number, to: number) => {
+    const slots = favs.map((f, i) => (f.taxid === taxid ? i : -1)).filter((i) => i >= 0);
+    if (from === to || from < 0 || to < 0 || from >= slots.length || to >= slots.length) return;
+    const sub = slots.map((i) => favs[i]);
+    const [item] = sub.splice(from, 1);
+    sub.splice(to, 0, item);
     const next = favs.slice();
-    const [item] = next.splice(from, 1);
-    next.splice(to, 0, item);
+    slots.forEach((gi, k) => { next[gi] = sub[k]; });
     save(next);
   };
-  const clear = () => save([]);
-  return <C.Provider value={{ favs, has, toggle, remove, move, clear, full }}>{children}</C.Provider>;
+  const clear = (taxid: string) => save(favs.filter((f) => f.taxid !== taxid));
+  return <C.Provider value={{ favs, forOrg, has, toggle, remove, move, clear, full }}>{children}</C.Provider>;
 }
 
 export function useFavourites(): Ctx {
-  return useContext(C) ?? { favs: [], has: () => false, toggle: () => {}, remove: () => {}, move: () => {}, clear: () => {}, full: false };
+  return useContext(C) ?? { favs: [], forOrg: () => [], has: () => false, toggle: () => {}, remove: () => {}, move: () => {}, clear: () => {}, full: false };
 }
 
 // The favourite bar — centred in the title bar (always rendered so it reserves the middle slot and
@@ -50,8 +66,10 @@ export function useFavourites(): Ctx {
 // chip to jump to that gene; the small ✕ removes one.
 // `onPick` decides what a chip click does (the Layout makes it mode-aware: select on the home page,
 // navigate on the entry page). Without it, a chip just navigates to the gene's entry.
-export function FavouriteBar({ onPick }: { onPick?: (f: Fav) => void }) {
-  const { favs, remove, move, clear, full } = useFavourites();
+// `taxid` scopes the bar to one organism — only its favourites show, and reorder/clear act on it alone.
+export function FavouriteBar({ onPick, taxid }: { onPick?: (f: Fav) => void; taxid: string }) {
+  const { forOrg, remove, move, clear, full } = useFavourites();
+  const favs = forOrg(taxid);
   const nav = useNavigate();
   const open = (f: Fav) => (onPick ? onPick(f) : nav(`/o/${f.taxid}/c/${encodeURIComponent(f.chrom)}/entry/${f.uniqID}`));
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -63,9 +81,9 @@ export function FavouriteBar({ onPick }: { onPick?: (f: Fav) => void }) {
       <div className={`inline-flex max-w-full items-center gap-1.5 rounded-full border bg-neutral-100 px-2 py-1 transition-colors ${full ? 'border-red-500' : 'border-transparent'}`}>
         <span title="favourites" aria-hidden className={`shrink-0 text-sm leading-none ${favs.length ? 'text-amber-400' : 'text-neutral-400 dark:text-neutral-500'}`}>{favs.length ? '★' : '☆'}</span>
         <div
-          className="flex min-w-[9rem] flex-wrap items-center justify-center gap-x-2 gap-y-1"
+          className="flex min-w-[9rem] flex-nowrap items-center justify-center gap-x-2 overflow-x-auto"
           onDragOver={(e) => { if (dragIdx !== null) e.preventDefault(); }}
-          onDrop={(e) => { e.preventDefault(); if (dragIdx !== null && overGap !== null) move(dragIdx, overGap <= dragIdx ? overGap : overGap - 1); setDragIdx(null); setOverGap(null); }}
+          onDrop={(e) => { e.preventDefault(); if (dragIdx !== null && overGap !== null) move(taxid, dragIdx, overGap <= dragIdx ? overGap : overGap - 1); setDragIdx(null); setOverGap(null); }}
         >
           {favs.length === 0 ? (
             <span className="text-[11px] text-neutral-400">no favourites yet</span>
@@ -93,7 +111,7 @@ export function FavouriteBar({ onPick }: { onPick?: (f: Fav) => void }) {
             </>
           )}
         </div>
-        <button type="button" title="clear all favourites" onClick={clear} disabled={!favs.length}
+        <button type="button" title="clear this organism's favourites" onClick={() => clear(taxid)} disabled={!favs.length}
           className={`shrink-0 cursor-pointer rounded px-1 text-[10px] transition-colors disabled:cursor-default disabled:opacity-30 ${full ? 'text-red-500' : 'text-neutral-400 hover:text-neutral-700'}`}>clear</button>
       </div>
     </div>

@@ -1,0 +1,7 @@
+{
+  "_comment": "Org-specific infra config for Neisseria gonorrhoeae FA 1090 (taxid 242231). Cross-database IDs verified against KEGG/NCBI/STRING/PaxDb during AMR onboarding (see README.md for join caveats). available:false until the backend is built and the archive is hosted — then set available:true + url + bytes. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "242231",
+  "speciesTaxid": "485",
+  "refAssembly": "GCF_000006845.1",
+  "available": false
+}

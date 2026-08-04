@@ -1,6 +1,6 @@
 {
   "name": "@uniome/desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "UniOme desktop app (Electron shell around the embedded Fastify server + web UI)",
   "author": "yjzhng (https://github.com/yjzhng)",

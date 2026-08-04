@@ -1,0 +1,8 @@
+{
+  "_comment": "Org-specific infra config for Salmonella enterica serovar Typhimurium LT2 (taxid 99287). Cross-database IDs verified against KEGG/NCBI/STRING/PaxDb during AMR onboarding (see README.md for join caveats). available:false until the backend is built and the archive is hosted — then set available:true + url + bytes. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "99287",
+  "speciesTaxid": "28901",
+  "refAssembly": "GCF_000006945.2",
+  "paxdbSpecies": "99287",
+  "available": false
+}

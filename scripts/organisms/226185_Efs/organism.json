@@ -1,0 +1,7 @@
+{
+  "_comment": "Org-specific infra config for Enterococcus faecalis V583 (taxid 226185). Cross-database IDs verified against KEGG/NCBI/STRING/PaxDb during AMR onboarding (see README.md for join caveats). available:false until the backend is built and the archive is hosted — then set available:true + url + bytes. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "226185",
+  "speciesTaxid": "1351",
+  "refAssembly": "GCF_000007785.1",
+  "available": false
+}

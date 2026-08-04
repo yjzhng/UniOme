@@ -1,11 +1,20 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+// The app version comes from the desktop package (what the GitHub release is tagged as), injected at
+// build time so the in-app update check can compare it to the latest release.
+const appVersion = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../desktop/package.json', import.meta.url)), 'utf8'),
+).version as string;
 
 export default defineConfig({
   // Relative asset URLs so the built bundle works wherever it's mounted (the desktop shell serves
   // it from the embedded server root; also fine for file:// or a sub-path static host).
   base: './',
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   plugins: [react(), tailwindcss()],
   server: {
     // The launcher (UniOme.command) picks free ports and passes them in; fall back to the

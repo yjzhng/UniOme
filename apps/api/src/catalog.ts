@@ -12,13 +12,15 @@ import { resourcesRoot } from './resources.js';
 // 3-state lifecycle: planned (tile only, or available:false) → available (available:true + url, not
 // on disk) → ready (data discovered on disk).
 
-interface Tile { taxid: string; nickname?: string; keggid?: string; name?: string; folder?: string }
+interface Tile { taxid: string; nickname?: string; keggid?: string; name?: string; folder?: string; amr?: string; gram?: string }
 interface OrgConfig { available?: boolean; url?: string; bytes?: number }
 export interface CatalogEntry {
   taxid: string;
   nickname?: string;
   keggid?: string;
   name?: string; // human-readable label shown before download (precise name is DB-derived once ready)
+  amr?: string;  // AMR priority level: critical | high | medium | model — used to group home-page tiles
+  gram?: string; // Gram stain: positive | negative — used to group home-page tiles
   folder: string;
   available: boolean;
   url?: string;
@@ -60,7 +62,7 @@ export function catalog(): CatalogEntry[] {
   return readTiles().map((t) => {
     const folder = folderOf(t);
     const cfg = orgConfig(folder);
-    return { taxid: t.taxid, nickname: t.nickname, keggid: t.keggid, name: t.name, folder, available: !!cfg.available, url: cfg.url, bytes: cfg.bytes };
+    return { taxid: t.taxid, nickname: t.nickname, keggid: t.keggid, name: t.name, amr: t.amr, gram: t.gram, folder, available: !!cfg.available, url: cfg.url, bytes: cfg.bytes };
   });
 }
 

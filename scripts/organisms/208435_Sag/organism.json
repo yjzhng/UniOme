@@ -1,0 +1,8 @@
+{
+  "_comment": "Org-specific infra config for Streptococcus agalactiae 2603V/R (taxid 208435). Cross-database IDs verified against KEGG/NCBI/STRING/PaxDb during AMR onboarding (see README.md for join caveats). available:false until the backend is built and the archive is hosted — then set available:true + url + bytes. keggid/nickname are in resources/organism-catalog.json.",
+  "stringSpecies": "208435",
+  "speciesTaxid": "1311",
+  "refAssembly": "GCF_000007265.1",
+  "paxdbSpecies": "208435",
+  "available": false
+}
